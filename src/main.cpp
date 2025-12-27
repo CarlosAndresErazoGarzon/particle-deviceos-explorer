@@ -9,36 +9,54 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 
+const int BTN_A = D4; 
+const int BTN_B = D3;
+const int BTN_C = D2;
+
+
 Adafruit_SSD1306 display(128, 32, &Wire, -1);
 
 
 SYSTEM_MODE(AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 
-void hardwareConfig() {
-    if_wiznet_pin_remap remap = {};
-    remap.base.type = IF_WIZNET_DRIVER_SPECIFIC_PIN_REMAP;
-    remap.cs_pin = D5;             
-    remap.reset_pin = PIN_INVALID; 
-    remap.int_pin   = PIN_INVALID;
-    
-    if_request(nullptr, IF_REQ_DRIVER_SPECIFIC, &remap, sizeof(remap), nullptr);
-    System.enableFeature(FEATURE_ETHERNET_DETECTION);
+void printUI(String title, String subtitle) {
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.println(title);
+    display.setCursor(0,16);
+    display.println(subtitle);
+    display.display();
 }
-STARTUP(hardwareConfig());
 
 void setup() {
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    display.clearDisplay();
     display.setTextColor(WHITE);
     display.setTextSize(1);
-    display.setCursor(0,0);
-    display.println("SISTEMA ONLINE");
-    display.println("Modo: Automatico");
-    display.display();
+    
+    pinMode(BTN_A, INPUT_PULLUP);
+    pinMode(BTN_B, INPUT_PULLUP);
+    pinMode(BTN_C, INPUT_PULLUP);
+    
+
+    printUI("SISTEMA LISTO", "Esperando...");
 }
 
 
 void loop() {
 
+    if (digitalRead(BTN_A) == LOW) {
+        printUI("BOTON A", "Presionado");
+        delay(100); 
+    }
+    
+    if (digitalRead(BTN_B) == LOW) {
+        printUI("BOTON B", "Presionado");
+        delay(100);
+    }
+
+    if (digitalRead(BTN_C) == LOW) {
+        printUI("BOTON C", "Presionado");
+        delay(100);
+    }
 }
