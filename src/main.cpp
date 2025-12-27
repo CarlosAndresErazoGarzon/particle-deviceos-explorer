@@ -11,6 +11,7 @@
 #include "Adafruit_SSD1306.h"
 
 #include "c_modules/gpio_core.h"
+#include "c_modules/timer_logic.h"
 
 // Wrapper
 extern "C" uint32_t bridge_millis() {
@@ -25,9 +26,21 @@ extern "C" uint32_t bridge_millis() {
 const int BTN_A = D4; 
 const int BTN_B = D3;
 const int BTN_C = D2;
+const int LED_HEARTBEAT = D7;
 
 // Display
 Adafruit_SSD1306 display(128, 32, &Wire, -1);
+
+// --------------------------------------------------------
+// SOFTWARE TIMERS CALLBACKS
+// --------------------------------------------------------
+
+void onHeartbeatTick() {
+
+    bool newState = timer_core_toggle_heartbeat();
+    digitalWrite(LED_HEARTBEAT, newState);
+}
+Timer heartbeatTimer(500, onHeartbeatTick);
 
 // --------------------------------------------------------
 // SYS CONFIG
@@ -57,7 +70,7 @@ void renderUI() {
 
     display.setCursor(0,0);
     display.setTextSize(1);
-    display.println("Interrupts Active");
+    display.println("Timers Running...");
 
     display.setCursor(0, 12);
     display.printf("A:%d  B:%d", core_get_counter_a(), core_get_counter_b());
@@ -86,11 +99,15 @@ void setup() {
     pinMode(BTN_A, INPUT_PULLUP);
     pinMode(BTN_B, INPUT_PULLUP);
     pinMode(BTN_C, INPUT_PULLUP);
+    pinMode(LED_HEARTBEAT, OUTPUT);
 
     // Interruptions
     attachInterrupt(BTN_A, core_isr_btn_a, FALLING);
     attachInterrupt(BTN_B, core_isr_btn_b, FALLING);
     attachInterrupt(BTN_C, core_isr_btn_c, FALLING);
+
+    // Timers
+    heartbeatTimer.start();
 }
 
 
