@@ -7,6 +7,8 @@
 #include <fcntl.h>      // open, O_RDWR, O_CREAT
 #include <unistd.h>     // write, read, close
 #include <sys/stat.h>   // struct stat
+#include <unistd.h>     // unlink
+#include <errno.h>      // errno
 
 #define FILENAME "state.bin"
 #define MAGIC_KEY 0xCAFEBABE
@@ -48,4 +50,11 @@ bool storage_load_state(AppState* state) {
     }
 
     return true;
+}
+
+bool storage_reset_data(void) {
+    // unlink removes the inode from the filesystem
+    int result = unlink(FILENAME);
+    
+    return (result == 0 || errno == ENOENT);
 }

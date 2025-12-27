@@ -27,6 +27,8 @@ typedef struct {
 bool storage_save_state(const AppState* state);
 // Loads the state from memory
 bool storage_load_state(AppState* state);
+// Resets data from memory
+bool storage_reset_data(void);
 
 #ifdef __cplusplus
 }

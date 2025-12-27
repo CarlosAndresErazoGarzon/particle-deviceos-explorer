@@ -1,0 +1,32 @@
+/*
+ * File: src/cpp_libraries/CloudManager.h
+ * Description: Interface for Particle Cloud primitives.
+ */
+
+#ifndef CLOUD_MANAGER_H
+#define CLOUD_MANAGER_H
+
+#include "Particle.h"
+
+class CloudManager {
+public:
+    CloudManager();
+    
+    // Variables & functions
+    void begin();
+
+    // Updates
+    void sync(int a, int b, int c);
+
+private:
+    // Shadow Variables
+    int _cloudCountA;
+    int _cloudCountB;
+    int _cloudCountC;
+
+    // Cloud Functions Callbacks
+    static int cloudResetCounters(String command);
+    static int cloudToggleLed(String command);
+};
+
+#endif // CLOUD_MANAGER_H

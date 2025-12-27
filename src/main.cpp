@@ -14,6 +14,7 @@
 #include "c_modules/storage_core.h"
 
 #include "cpp_modules/UIManager.h"
+#include "cpp_modules/CloudManager.h"
 
 // Magic Key for validation
 #define MAGIC_VALIDATION_KEY 0xCAFEBABE
@@ -29,6 +30,7 @@ const int BTN_B = D3;
 const int BTN_C = D2;
 const int LED_HEARTBEAT = D7;
 
+// Prototypes
 void onHeartbeatTick();
 void performSafeSave();
 void loadData();
@@ -36,18 +38,14 @@ void processAppState();
 
 // Global Objects
 UIManager ui;
+CloudManager cloud;
 Timer heartbeatTimer(500, onHeartbeatTick);
-
-// State Variables
-bool pendingSave = false;
-unsigned long lastChangeTime = 0;
-bool lastSaveStatus = false;
 
 // --------------------------------------------------------
 // SYS CONFIG
 // --------------------------------------------------------
 
-SYSTEM_MODE(MANUAL);
+SYSTEM_MODE(AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 
 // --------------------------------------------------------
@@ -68,9 +66,10 @@ extern "C" uint32_t bridge_millis() {
 }
 
 void onHeartbeatTick() {
-
-    bool newState = timer_core_toggle_heartbeat();
-    digitalWrite(LED_HEARTBEAT, newState);
+    if (timer_core_is_heartbeat_enabled()) {
+        bool newState = timer_core_toggle_heartbeat();
+        digitalWrite(LED_HEARTBEAT, newState);
+    }
 }
 
 // --- Application Logic Functions ---
@@ -97,43 +96,45 @@ void loadData() {
 }
 
 void processAppState() {
-    // Static variables preserve state between function calls
     static bool pendingSave = false;
     static unsigned long lastChangeTime = 0;
+    
+    // Sync Timer
+    static unsigned long lastCloudSync = 0;
 
-    // Check for Hardware Events
+    // Hardware Check
     noInterrupts();
     bool hardwareStateChanged = core_check_and_clear_ui_flag();
     interrupts();
 
-    // 2. React to Changes
+    // React
     if (hardwareStateChanged) {
-        // Immediate UI feedback
         ui.renderDashboard(
             core_get_counter_a(), 
             core_get_counter_b(), 
             core_get_counter_c(), 
-            false // Not saved yet
+            false
         );
-        
-        // Schedule deferred save
         pendingSave = true;
         lastChangeTime = millis();
     }
 
-    // Handle Deferred Save (Time-triggered)
-    if (pendingSave && (millis() - lastChangeTime > SAVE_DELAY_MS)) {
-        performSafeSave();
-        
-        // Reset Logic
-        pendingSave = false;
-        
-        // Update UI to show confirmation
-        ui.renderDashboard(
+    // CLOUD SYNC
+    if (millis() - lastCloudSync > 1000) {
+        cloud.sync(
             core_get_counter_a(), 
             core_get_counter_b(), 
-            core_get_counter_c(), 
-            true // Saved 
+            core_get_counter_c()
+        );
+        lastCloudSync = millis();
+    }
+
+    // Persistence Logic
+    if (pendingSave && (millis() - lastChangeTime > SAVE_DELAY_MS)) {
+        performSafeSave();
+        pendingSave = false;
+        ui.renderDashboard(
+            core_get_counter_a(), core_get_counter_b(), core_get_counter_c(), true
         );
     }
 }
@@ -152,6 +153,9 @@ void setup() {
     // Initialize Data
     loadData();
 
+    // Init Cloud
+    cloud.begin();
+
     // Pin config
     pinMode(BTN_A, INPUT_PULLUP);
     pinMode(BTN_B, INPUT_PULLUP);
@@ -167,6 +171,7 @@ void setup() {
     heartbeatTimer.start();
 
     // Initial Render
+    cloud.sync(core_get_counter_a(), core_get_counter_b(), core_get_counter_c());
     ui.renderDashboard(core_get_counter_a(), core_get_counter_b(), core_get_counter_c(), false);
 }
 

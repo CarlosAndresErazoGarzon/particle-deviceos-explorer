@@ -14,6 +14,8 @@ extern "C" {
 
 // --- Heartbeat Logic ---
 bool timer_core_toggle_heartbeat(void);
+void timer_core_set_heartbeat_enable(bool enabled);
+bool timer_core_is_heartbeat_enabled(void);
 
 #ifdef __cplusplus
 }
