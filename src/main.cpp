@@ -1,6 +1,6 @@
 /* 
  * Project particle-deviceos-explorer
- * Branch: feature/03-filesystem-littlefs
+ * Branch: feature/04-cloud-primitives
  * Author: Carlos Erazo
  */
 
