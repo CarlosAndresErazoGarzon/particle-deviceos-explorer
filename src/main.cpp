@@ -1,8 +1,7 @@
 /* 
  * Project particle-deviceos-explorer
- * Branch: feature/01-interrupts-gpio
+ * Branch: feature/02-software-timers
  * Author: Carlos Erazo
- * Description: GPIO management with software interruptions
  */
 
 
