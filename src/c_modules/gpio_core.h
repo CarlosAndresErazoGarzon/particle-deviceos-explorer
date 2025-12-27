@@ -29,6 +29,9 @@ void core_isr_btn_a(void);
 void core_isr_btn_b(void);
 void core_isr_btn_c(void);
 
+// Restore internal counters from an external source
+void core_set_counters(int a, int b, int c);
+
 #ifdef __cplusplus
 }
 #endif

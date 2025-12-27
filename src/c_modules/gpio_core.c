@@ -77,3 +77,10 @@ void core_isr_btn_c(void) {
         ui_update_needed = true;
     }
 }
+
+// --- Setters ---
+void core_set_counters(int a, int b, int c) {
+    internal_counter_a = a;
+    internal_counter_b = b;
+    internal_counter_c = c;
+}
