@@ -4,7 +4,6 @@
  * Author: Carlos Erazo
  */
 
-
 #include "Particle.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
@@ -32,7 +31,6 @@ const int LED_HEARTBEAT = D7;
 
 // Prototypes
 void onHeartbeatTick();
-void performSafeSave();
 void loadData();
 void processAppState();
 
@@ -74,16 +72,6 @@ void onHeartbeatTick() {
 
 // --- Application Logic Functions ---
 
-void performSafeSave() {
-    AppState currentState;
-    currentState.countA = core_get_counter_a();
-    currentState.countB = core_get_counter_b();
-    currentState.countC = core_get_counter_c();
-    currentState.magic_number = MAGIC_VALIDATION_KEY;
-    
-    storage_save_state(&currentState);
-}
-
 void loadData() {
     AppState savedState;
     if (storage_load_state(&savedState)) {
@@ -95,48 +83,25 @@ void loadData() {
     delay(1000);
 }
 
+// --- Logic ---
 void processAppState() {
-    static bool pendingSave = false;
-    static unsigned long lastChangeTime = 0;
-    
-    // Sync Timer
     static unsigned long lastCloudSync = 0;
 
-    // Hardware Check
+    // Hardware Interactions
     noInterrupts();
     bool hardwareStateChanged = core_check_and_clear_ui_flag();
     interrupts();
 
-    // React
     if (hardwareStateChanged) {
-        ui.renderDashboard(
-            core_get_counter_a(), 
-            core_get_counter_b(), 
-            core_get_counter_c(), 
-            false
-        );
-        pendingSave = true;
-        lastChangeTime = millis();
+        ui.renderDashboard(core_get_counter_a(), core_get_counter_b(), core_get_counter_c(), false);
     }
 
-    // CLOUD SYNC
+    // Cloud Sync
     if (millis() - lastCloudSync > 1000) {
-        cloud.sync(
-            core_get_counter_a(), 
-            core_get_counter_b(), 
-            core_get_counter_c()
-        );
+        cloud.sync(core_get_counter_a(), core_get_counter_b(), core_get_counter_c());
         lastCloudSync = millis();
     }
 
-    // Persistence Logic
-    if (pendingSave && (millis() - lastChangeTime > SAVE_DELAY_MS)) {
-        performSafeSave();
-        pendingSave = false;
-        ui.renderDashboard(
-            core_get_counter_a(), core_get_counter_b(), core_get_counter_c(), true
-        );
-    }
 }
 
 // --------------------------------------------------------

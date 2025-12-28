@@ -5,9 +5,8 @@
 
 #include "storage_core.h"
 #include <fcntl.h>      // open, O_RDWR, O_CREAT
-#include <unistd.h>     // write, read, close
+#include <unistd.h>     // write, read, close, unlink
 #include <sys/stat.h>   // struct stat
-#include <unistd.h>     // unlink
 #include <errno.h>      // errno
 
 #define FILENAME "state.bin"
@@ -57,4 +56,9 @@ bool storage_reset_data(void) {
     int result = unlink(FILENAME);
     
     return (result == 0 || errno == ENOENT);
+}
+
+bool storage_file_exists(void) {
+    struct stat st;
+    return (stat(FILENAME, &st) == 0);
 }

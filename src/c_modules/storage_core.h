@@ -29,6 +29,8 @@ bool storage_save_state(const AppState* state);
 bool storage_load_state(AppState* state);
 // Resets data from memory
 bool storage_reset_data(void);
+// Checks the Bin file
+bool storage_file_exists(void);
 
 #ifdef __cplusplus
 }

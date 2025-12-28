@@ -22,9 +22,16 @@ void CloudManager::begin() {
     Particle.variable("cnt_b", _cloudCountB);
     Particle.variable("cnt_c", _cloudCountC);
 
-    // Push Funciones
+    // --- Push Funciones ---
+    // Register Functions
     Particle.function("reset_all", cloudResetCounters);
     Particle.function("toggle_led", cloudToggleLed);
+
+    // File System Functions
+    Particle.function("save_data", cloudSaveData);
+    Particle.function("del_data", cloudDeleteData);
+    Particle.function("chk_data", cloudCheckData);
+    Particle.function("scan_i2c", cloudScanI2C);
 }
 
 void CloudManager::sync(int a, int b, int c) {
@@ -59,4 +66,52 @@ int CloudManager::cloudResetCounters(String command) {
     timer_core_set_heartbeat_enable(true);
     
     return 1;
+}
+
+// RPC: Manual Save
+int CloudManager::cloudSaveData(String command) {
+    // Gather current state
+    AppState currentState;
+    currentState.countA = core_get_counter_a();
+    currentState.countB = core_get_counter_b();
+    currentState.countC = core_get_counter_c();
+    currentState.magic_number = 0xCAFEBABE;
+
+    // Write to disk
+    bool success = storage_save_state(&currentState);
+    
+    return success ? 1 : -1;
+}
+
+// RPC: Delete File
+int CloudManager::cloudDeleteData(String command) {
+    return storage_reset_data() ? 1 : 0;
+}
+
+// RPC: Check File Exists
+int CloudManager::cloudCheckData(String command) {
+    return storage_file_exists() ? 1 : 0;
+}
+
+int CloudManager::cloudScanI2C(String command) {
+    Log.info("CLOUD: Scanning I2C Bus...");
+    
+    int devicesFound = 0;
+    int firstAddress = -1;
+
+    for (uint8_t address = 1; address < 127; address++) {
+        // Wire.beginTransmission devuelve 0 si el dispositivo responde (ACK)
+        Wire.beginTransmission(address);
+        uint8_t error = Wire.endTransmission();
+
+        if (error == 0) {
+            Log.info("I2C Device found at address: 0x%02X", address);
+            if (firstAddress == -1) firstAddress = address;
+            devicesFound++;
+        }
+    }
+    
+    // Si encontramos dispositivos, devolvemos la dirección del primero para verla en consola.
+    // Si no, devolvemos -1.
+    return (devicesFound > 0) ? firstAddress : -1;
 }

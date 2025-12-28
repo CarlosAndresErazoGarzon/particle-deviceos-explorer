@@ -27,6 +27,10 @@ private:
     // Cloud Functions Callbacks
     static int cloudResetCounters(String command);
     static int cloudToggleLed(String command);
+    static int cloudSaveData(String command);
+    static int cloudDeleteData(String command);
+    static int cloudCheckData(String command);
+    static int cloudScanI2C(String command);
 };
 
 #endif // CLOUD_MANAGER_H
