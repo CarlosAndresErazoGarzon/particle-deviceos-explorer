@@ -24,6 +24,8 @@ private:
     int _cloudCountB;
     int _cloudCountC;
 
+    static char _jsonBuffer[622];
+
     // Cloud Functions Callbacks
     static int cloudResetCounters(String command);
     static int cloudToggleLed(String command);
@@ -31,6 +33,10 @@ private:
     static int cloudDeleteData(String command);
     static int cloudCheckData(String command);
     static int cloudScanI2C(String command);
+    static int cloudGetStatus(String command);
+
+    // Event Handler
+    void handleCloudEvent(const char *event, const char *data);
 };
 
 #endif // CLOUD_MANAGER_H

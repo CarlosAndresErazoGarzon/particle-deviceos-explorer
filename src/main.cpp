@@ -39,12 +39,14 @@ UIManager ui;
 CloudManager cloud;
 Timer heartbeatTimer(500, onHeartbeatTick);
 
+SerialLogHandler logHandler(LOG_LEVEL_INFO);
+
 // --------------------------------------------------------
 // SYS CONFIG
 // --------------------------------------------------------
 
 SYSTEM_MODE(AUTOMATIC);
-SYSTEM_THREAD(ENABLED);
+// SYSTEM_THREAD(ENABLED);
 
 // --------------------------------------------------------
 // HARDWARE CONFIG

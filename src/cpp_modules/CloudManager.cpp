@@ -8,7 +8,12 @@
 #include "../c_modules/storage_core.h"
 #include "../c_modules/timer_logic.h"
 
+#include <ArduinoJson.h>
+
 static bool _ledState = false;
+const int JSON_CAPACITY = 1024;
+char CloudManager::_jsonBuffer[622];
+
 
 CloudManager::CloudManager() {
     _cloudCountA = 0;
@@ -21,6 +26,7 @@ void CloudManager::begin() {
     Particle.variable("cnt_a", _cloudCountA);
     Particle.variable("cnt_b", _cloudCountB);
     Particle.variable("cnt_c", _cloudCountC);
+    Particle.variable("json_status", _jsonBuffer);
 
     // --- Push Funciones ---
     // Register Functions
@@ -32,6 +38,12 @@ void CloudManager::begin() {
     Particle.function("del_data", cloudDeleteData);
     Particle.function("chk_data", cloudCheckData);
     Particle.function("scan_i2c", cloudScanI2C);
+
+    // --- Get JSON Status ---
+    Particle.function("get_status", cloudGetStatus);
+
+    // Event Subscription
+    Particle.subscribe("cmd/status", &CloudManager::handleCloudEvent, this);
 }
 
 void CloudManager::sync(int a, int b, int c) {
@@ -111,7 +123,50 @@ int CloudManager::cloudScanI2C(String command) {
         }
     }
     
-    // Si encontramos dispositivos, devolvemos la dirección del primero para verla en consola.
-    // Si no, devolvemos -1.
     return (devicesFound > 0) ? firstAddress : -1;
+}
+
+// RPC: Get Full System Status as JSON
+int CloudManager::cloudGetStatus(String command) {
+    Log.info("CLOUD: Generating Status JSON...");
+
+    // Create JSON Document
+    JsonDocument doc;
+
+    // Add Hardware Data
+    doc["counters"]["a"] = core_get_counter_a();
+    doc["counters"]["b"] = core_get_counter_b();
+    doc["counters"]["c"] = core_get_counter_c();
+
+    // Add System Info
+    doc["system"]["uptime"] = System.uptime();
+    doc["system"]["free_mem"] = System.freeMemory();
+    doc["system"]["device_id"] = System.deviceID(); 
+    doc["system"]["wifi_strength"] = WiFi.RSSI().getStrength();
+
+    // Serialize to a char buffer
+    char outputBuffer[1024];
+    
+    // Clear buffer to be safe
+    memset(outputBuffer, 0, sizeof(outputBuffer));
+
+    // Serialize
+    size_t bytesWritten = serializeJson(doc, outputBuffer, sizeof(outputBuffer));
+
+    // Convert to Particle String for publishing
+    String jsonOutput = String(outputBuffer);
+
+    // Publish Event
+    Particle.publish("app/status/report", jsonOutput, PRIVATE);
+    serializeJson(doc, _jsonBuffer, sizeof(_jsonBuffer));
+
+    Log.info("Status sent (%d bytes): %s", bytesWritten, outputBuffer);
+
+    return 1;
+}
+
+// --- Event Handler ---
+void CloudManager::handleCloudEvent(const char *event, const char *data) {
+    Log.info("CLOUD: Evento recibido: %s", event);
+    cloudGetStatus(""); 
 }
