@@ -1,5 +1,5 @@
 /*
- * File: src/cpp_libraries/CloudManager.cpp
+ * File: src/cpp_modules/CloudManager.cpp
  * Description: Implementation of Cloud primitives.
  */
 
@@ -112,7 +112,6 @@ int CloudManager::cloudScanI2C(String command) {
     int firstAddress = -1;
 
     for (uint8_t address = 1; address < 127; address++) {
-        // Wire.beginTransmission devuelve 0 si el dispositivo responde (ACK)
         Wire.beginTransmission(address);
         uint8_t error = Wire.endTransmission();
 

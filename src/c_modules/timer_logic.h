@@ -1,6 +1,6 @@
 /*
  * File: src/c_modules/timer_logic.h
- * Description: Logic for periodic tasks (Software Timers).
+ * Description: Logic for periodic tasks.
  */
 
 #ifndef TIMER_LOGIC_H

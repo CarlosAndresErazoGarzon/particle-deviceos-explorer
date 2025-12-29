@@ -1,6 +1,6 @@
 /*
  * File: src/c_modules/storage_core.h
- * Description: Interface for low-level file system operations (LittleFS).
+ * Description: Interface for low-level file system operations.
  */
 
 #ifndef STORAGE_CORE_H

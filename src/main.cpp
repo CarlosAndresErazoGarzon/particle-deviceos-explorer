@@ -33,13 +33,16 @@ const int LED_HEARTBEAT = D7;
 void onHeartbeatTick();
 void loadData();
 void processAppState();
+void monitorThreadFunction(void *param);
+void systemEventHandler(system_event_t event, int param);
 
 // Global Objects
 UIManager ui;
 CloudManager cloud;
 Timer heartbeatTimer(500, onHeartbeatTick);
-
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
+Thread monitorThread;
+volatile bool systemOnline = false;
 
 // --------------------------------------------------------
 // SYS CONFIG
@@ -60,50 +63,9 @@ void hardwareConfig() {
 }
 STARTUP(hardwareConfig());
 
-// --- Callbacks & Helpers ---
+// --- Callbacks ---
 extern "C" uint32_t bridge_millis() {
     return (uint32_t)millis();
-}
-
-void onHeartbeatTick() {
-    if (timer_core_is_heartbeat_enabled()) {
-        bool newState = timer_core_toggle_heartbeat();
-        digitalWrite(LED_HEARTBEAT, newState);
-    }
-}
-
-// --- Application Logic Functions ---
-
-void loadData() {
-    AppState savedState;
-    if (storage_load_state(&savedState)) {
-        core_set_counters(savedState.countA, savedState.countB, savedState.countC);
-        ui.showMessage("DATA RESTORED", "Welcome Back");
-    } else {
-        ui.showMessage("NEW SESSION", "No Data Found");
-    }
-    delay(1000);
-}
-
-// --- Logic ---
-void processAppState() {
-    static unsigned long lastCloudSync = 0;
-
-    // Hardware Interactions
-    noInterrupts();
-    bool hardwareStateChanged = core_check_and_clear_ui_flag();
-    interrupts();
-
-    if (hardwareStateChanged) {
-        ui.renderDashboard(core_get_counter_a(), core_get_counter_b(), core_get_counter_c(), false);
-    }
-
-    // Cloud Sync
-    if (millis() - lastCloudSync > 1000) {
-        cloud.sync(core_get_counter_a(), core_get_counter_b(), core_get_counter_c());
-        lastCloudSync = millis();
-    }
-
 }
 
 // --------------------------------------------------------
@@ -123,6 +85,9 @@ void setup() {
     // Init Cloud
     cloud.begin();
 
+    // Listener
+    System.on(cloud_status, systemEventHandler);
+
     // Pin config
     pinMode(BTN_A, INPUT_PULLUP);
     pinMode(BTN_B, INPUT_PULLUP);
@@ -140,9 +105,102 @@ void setup() {
     // Initial Render
     cloud.sync(core_get_counter_a(), core_get_counter_b(), core_get_counter_c());
     ui.renderDashboard(core_get_counter_a(), core_get_counter_b(), core_get_counter_c(), false);
+
+    // Start Monitor Thread
+    monitorThread = Thread("Monitor", monitorThreadFunction);
+    Log.info("SISTEMA: Hilo Principal y Monitor iniciados.");
 }
 
+// --------------------------------------------------------
+// MAIN LOOP
+// --------------------------------------------------------
 
 void loop() {
     processAppState();
+}
+
+// --------------------------------------------------------
+// MONITOR THREAD
+// --------------------------------------------------------
+
+void monitorThreadFunction(void *param) {
+    while(true) {
+
+        int wifiStrength = -127;
+        if (WiFi.ready()) {
+             wifiStrength = WiFi.RSSI().getStrength();
+        }
+
+        static unsigned long lastLogTime = 0;
+        if (millis() - lastLogTime > 5000) {
+            Log.info("[MONITOR] Memoria: %lu | WiFi: %d dBm | Estado: %s", 
+                 System.freeMemory(), 
+                 wifiStrength, 
+                 systemOnline ? "ONLINE" : "OFFLINE");
+            lastLogTime = millis();
+        }
+
+        delay(1000); 
+    }
+}
+
+// --------------------------------------------------------
+// HELPERS
+// --------------------------------------------------------
+
+// --- Application Logic Functions ---
+
+void loadData() {
+    AppState savedState;
+    if (storage_load_state(&savedState)) {
+        core_set_counters(savedState.countA, savedState.countB, savedState.countC);
+        ui.showMessage("DATA RESTORED", "Welcome Back");
+    } else {
+        ui.showMessage("NEW SESSION", "No Data Found");
+    }
+    delay(1000);
+}
+
+// --- Logic ---
+void processAppState() {
+    static unsigned long lastCloudSync = 0;
+    static bool lastSystemOnline = false;
+
+    // Hardware Interactions
+    noInterrupts();
+    bool hardwareStateChanged = core_check_and_clear_ui_flag();
+    interrupts();
+
+    if (hardwareStateChanged || (systemOnline != lastSystemOnline)) {
+        
+        ui.renderDashboard(
+            core_get_counter_a(), 
+            core_get_counter_b(), 
+            core_get_counter_c(), 
+            systemOnline
+        );
+        
+        lastSystemOnline = systemOnline;
+    }
+
+    // Cloud Sync
+    if (millis() - lastCloudSync > 1000) {
+        cloud.sync(core_get_counter_a(), core_get_counter_b(), core_get_counter_c());
+        lastCloudSync = millis();
+    }
+
+}
+
+void onHeartbeatTick() {
+    if (timer_core_is_heartbeat_enabled()) {
+        bool newState = timer_core_toggle_heartbeat();
+        digitalWrite(LED_HEARTBEAT, newState);
+    }
+}
+
+// --- System Event Handler ---
+void systemEventHandler(system_event_t event, int param) {
+    if (event == cloud_status) {
+        systemOnline = (param == cloud_status_connected);
+    }
 }

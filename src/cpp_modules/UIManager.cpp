@@ -1,5 +1,5 @@
 /*
- * File: src/cpp_libraries/UIManager.cpp
+ * File: src/cpp_modules/UIManager.cpp
  * Description: Implementation of UIManager methods.
  */
 
@@ -10,7 +10,6 @@ UIManager::UIManager() : display(128, 32, &Wire, -1) {
 }
 
 bool UIManager::begin() {
-    // SSD1306_SWITCHCAPVCC generates display voltage from 3.3V internal
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         return false;
     }
@@ -33,23 +32,29 @@ void UIManager::showMessage(const char* title, const char* subtitle) {
     display.display();
 }
 
-void UIManager::renderDashboard(int countA, int countB, int countC, bool dataSaved) {
-    display.clearDisplay();
+void UIManager::renderDashboard(int countA, int countB, int countC, bool isOnline) {
+display.clearDisplay();
     
-    // Header
+    // --- Header ---
     display.setCursor(0,0);
-    if (dataSaved) {
-        display.println("SAVED [OK]");
+    display.print("DEV OS EXPLORER");
+
+    if (isOnline) {
+        display.fillCircle(120, 4, 3, WHITE);
     } else {
-        display.println("System Running...");
+        display.drawCircle(120, 4, 3, WHITE);
+        display.drawLine(117, 1, 123, 7, WHITE);
     }
 
-    // Counters Row
     display.setCursor(0, 12);
-    display.printf("A:%d  B:%d", countA, countB);
+    display.setTextSize(1);
+    display.printf("A: %d", countA);
+    
+    display.setCursor(64, 12); 
+    display.printf("B: %d", countB);
     
     display.setCursor(0, 22);
-    display.printf("C:%d", countC);
-    
+    display.printf("C: %d", countC);
+
     display.display();
 }

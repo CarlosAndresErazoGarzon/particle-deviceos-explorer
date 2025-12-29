@@ -1,5 +1,5 @@
 /*
- * File: src/cpp_libraries/UIManager.h
+ * File: src/cpp_modules/UIManager.h
  * Description: Class handling OLED display logic.
  */
 
@@ -19,7 +19,7 @@ public:
     bool begin();
 
     // Render the Dashboard view
-    void renderDashboard(int countA, int countB, int countC, bool dataSaved);
+    void renderDashboard(int countA, int countB, int countC, bool isOnline);
 
     // Show status messages
     void showMessage(const char* title, const char* subtitle);

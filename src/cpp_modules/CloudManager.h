@@ -1,5 +1,5 @@
 /*
- * File: src/cpp_libraries/CloudManager.h
+ * File: src/cpp_modules/CloudManager.h
  * Description: Interface for Particle Cloud primitives.
  */
 
