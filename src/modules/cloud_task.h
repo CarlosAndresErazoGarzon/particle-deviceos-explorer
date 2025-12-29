@@ -16,15 +16,18 @@ public:
     void begin();
 
     // Updates
-    void sync(int a, int b, int c);
+    void sync(int a, int b, int c, float sensorValue);
 
 private:
     // Shadow Variables
     int _cloudCountA;
     int _cloudCountB;
     int _cloudCountC;
+    float _cloudSensorValue;
 
     static char _jsonBuffer[622];
+
+    void updateJsonBuffer();
 
     // Cloud Functions Callbacks
     static int cloudResetCounters(String command);

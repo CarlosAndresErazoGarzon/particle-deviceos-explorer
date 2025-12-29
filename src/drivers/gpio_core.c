@@ -17,7 +17,7 @@ static volatile uint32_t last_debounce_a = 0;
 static volatile uint32_t last_debounce_b = 0;
 static volatile uint32_t last_debounce_c = 0;
 
-// --- Configuration ---
+// --- Config ---
 #define DEBOUNCE_THRESHOLD_MS 300
 
 // Dependency Injetion

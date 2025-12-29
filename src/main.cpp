@@ -1,204 +1,132 @@
-/* 
+/*
  * Project particle-deviceos-explorer
- * Branch: feature/04-cloud-primitives
+ * Branch: feature/07-cloud-primitives
  * Author: Carlos Erazo
  */
 
 #include "Particle.h"
-#include "Adafruit_GFX.h"
-#include "Adafruit_SSD1306.h"
+#include "system/rtos_manager.h"
 
-#include "c_modules/gpio_core.h"
-#include "c_modules/timer_logic.h"
-#include "c_modules/storage_core.h"
+// Drivers
+#include "drivers/gpio_core.h"
+#include "drivers/storage_core.h"
+#include "drivers/timer_logic.h"
 
-#include "cpp_modules/UIManager.h"
-#include "cpp_modules/CloudManager.h"
+// Modules
+#include "modules/cloud_task.h"
+#include "modules/ui_task.h"
 
-// Magic Key for validation
-#define MAGIC_VALIDATION_KEY 0xCAFEBABE
-#define SAVE_DELAY_MS 5000
+// Global RTOS Objects
+os_queue_t sensorQueue;
+os_mutex_t i2cMutex;
 
-// --------------------------------------------------------
-// DEFINITIONS & HARDWARE MAPPING
-// --------------------------------------------------------
+// Threads 
+os_thread_t sensorThreadHandle;
+os_thread_t uiThreadHandle;
 
-// Buttons
-const int BTN_A = D4; 
-const int BTN_B = D3;
-const int BTN_C = D2;
-const int LED_HEARTBEAT = D7;
-
-// Prototypes
-void onHeartbeatTick();
-void loadData();
-void processAppState();
-void monitorThreadFunction(void *param);
+// Tasks
+void ui_init();
+void sensorTaskFunction(void *param);
 void systemEventHandler(system_event_t event, int param);
 
+
 // Global Objects
-UIManager ui;
 CloudManager cloud;
-Timer heartbeatTimer(500, onHeartbeatTick);
-SerialLogHandler logHandler(LOG_LEVEL_INFO);
-Thread monitorThread;
 volatile bool systemOnline = false;
 
-// --------------------------------------------------------
-// SYS CONFIG
-// --------------------------------------------------------
+SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
 SYSTEM_MODE(AUTOMATIC);
-// SYSTEM_THREAD(ENABLED);
+SYSTEM_THREAD(ENABLED);
 
-// --------------------------------------------------------
-// HARDWARE CONFIG
-// --------------------------------------------------------
+// Hardware Definitions
+const int BTN_A = D4;
+const int BTN_B = D3;
+const int BTN_C = D2;
+const int LED_USER = D7;
 
-LEDStatus customTheme(LED_PATTERN_SOLID, LED_SPEED_NORMAL, LED_PRIORITY_IMPORTANT);
+void setup()
+{
+    // Debug Only: Uncomment to halt boot until Serial connects
+    // waitFor(Serial.isConnected, 10000);
+    // delay(1000);
 
-void hardwareConfig() {
-    customTheme.setColor(0x00030303); 
-    customTheme.setActive(true);
-}
-STARTUP(hardwareConfig());
+    // Log.info("=== RTOS SYSTEM BOOT ===");
 
-// --- Callbacks ---
-extern "C" uint32_t bridge_millis() {
-    return (uint32_t)millis();
-}
+    // RTOS Primitives
+    os_queue_create(&sensorQueue, sizeof(SensorMessage), SENSOR_QUEUE_SIZE, 0);
+    os_mutex_create(&i2cMutex);
 
-// --------------------------------------------------------
-// SETUP
-// --------------------------------------------------------
-
-void setup() {
-    // Dependency Injection
-    core_init(bridge_millis);
-
-    // I2C/Screen initialization
-    ui.begin();
-
-    // Initialize Data
-    loadData();
-
-    // Init Cloud
-    cloud.begin();
-
-    // Listener
-    System.on(cloud_status, systemEventHandler);
+    // Init Drivers
+    core_init(millis);
 
     // Pin config
     pinMode(BTN_A, INPUT_PULLUP);
     pinMode(BTN_B, INPUT_PULLUP);
     pinMode(BTN_C, INPUT_PULLUP);
-    pinMode(LED_HEARTBEAT, OUTPUT);
+    pinMode(LED_USER, OUTPUT);
 
     // Interruptions
     attachInterrupt(BTN_A, core_isr_btn_a, FALLING);
     attachInterrupt(BTN_B, core_isr_btn_b, FALLING);
     attachInterrupt(BTN_C, core_isr_btn_c, FALLING);
 
-    // Timers
-    heartbeatTimer.start();
+    // Init UI & Cloud
+    ui_init();
+    cloud.begin();
+    System.on(cloud_status, systemEventHandler);
 
-    // Initial Render
-    cloud.sync(core_get_counter_a(), core_get_counter_b(), core_get_counter_c());
-    ui.renderDashboard(core_get_counter_a(), core_get_counter_b(), core_get_counter_c(), false);
+    // Log.info("RTOS: Spawning Threads...");
 
-    // Start Monitor Thread
-    monitorThread = Thread("Monitor", monitorThreadFunction);
-    Log.info("SISTEMA: Hilo Principal y Monitor iniciados.");
+    // CREATE THREADS
+    // Sensor Thread
+    os_thread_create(
+        &sensorThreadHandle, 
+        "SensorTask", 
+        OS_THREAD_PRIORITY_DEFAULT, 
+        sensorTaskFunction, 
+        NULL, 
+        6000
+    );
+
+    // UI Thread
+    os_thread_create(
+        &uiThreadHandle, 
+        "UITask", 
+        OS_THREAD_PRIORITY_DEFAULT,
+        uiTaskFunction, 
+        NULL, 
+        6000
+    );
+
+    // Log.info("RTOS: Setup Complete.");
 }
 
-// --------------------------------------------------------
-// MAIN LOOP
-// --------------------------------------------------------
-
-void loop() {
-    processAppState();
-}
-
-// --------------------------------------------------------
-// MONITOR THREAD
-// --------------------------------------------------------
-
-void monitorThreadFunction(void *param) {
-    while(true) {
-
-        int wifiStrength = -127;
-        if (WiFi.ready()) {
-             wifiStrength = WiFi.RSSI().getStrength();
-        }
-
-        static unsigned long lastLogTime = 0;
-        if (millis() - lastLogTime > 5000) {
-            Log.info("[MONITOR] Memoria: %lu | WiFi: %d dBm | Estado: %s", 
-                 System.freeMemory(), 
-                 wifiStrength, 
-                 systemOnline ? "ONLINE" : "OFFLINE");
-            lastLogTime = millis();
-        }
-
-        delay(1000); 
+// --- MAIN LOOP ---
+void loop()
+{
+    // UI Status Handler
+    static bool lastOnline = false;
+    if (systemOnline != lastOnline)
+    {
+        ui_set_online_status(systemOnline);
+        lastOnline = systemOnline;
     }
-}
 
-// --------------------------------------------------------
-// HELPERS
-// --------------------------------------------------------
-
-// --- Application Logic Functions ---
-
-void loadData() {
-    AppState savedState;
-    if (storage_load_state(&savedState)) {
-        core_set_counters(savedState.countA, savedState.countB, savedState.countC);
-        ui.showMessage("DATA RESTORED", "Welcome Back");
-    } else {
-        ui.showMessage("NEW SESSION", "No Data Found");
-    }
-    delay(1000);
-}
-
-// --- Logic ---
-void processAppState() {
-    static unsigned long lastCloudSync = 0;
-    static bool lastSystemOnline = false;
-
-    // Hardware Interactions
-    noInterrupts();
-    bool hardwareStateChanged = core_check_and_clear_ui_flag();
-    interrupts();
-
-    if (hardwareStateChanged || (systemOnline != lastSystemOnline)) {
-        
-        ui.renderDashboard(
-            core_get_counter_a(), 
-            core_get_counter_b(), 
-            core_get_counter_c(), 
-            systemOnline
+    // RTOS -> Cloud Bridge
+    static unsigned long lastSync = 0;
+    if (millis() - lastSync > 2000) {
+        cloud.sync(
+            sharedState.countA, 
+            sharedState.countB, 
+            sharedState.countC,
+            (double) sharedState.latestSensorValue
         );
-        
-        lastSystemOnline = systemOnline;
-    }
-
-    // Cloud Sync
-    if (millis() - lastCloudSync > 1000) {
-        cloud.sync(core_get_counter_a(), core_get_counter_b(), core_get_counter_c());
-        lastCloudSync = millis();
-    }
-
-}
-
-void onHeartbeatTick() {
-    if (timer_core_is_heartbeat_enabled()) {
-        bool newState = timer_core_toggle_heartbeat();
-        digitalWrite(LED_HEARTBEAT, newState);
+        lastSync = millis();
     }
 }
 
-// --- System Event Handler ---
+// --- EVENT HANDLER ---
 void systemEventHandler(system_event_t event, int param) {
     if (event == cloud_status) {
         systemOnline = (param == cloud_status_connected);
