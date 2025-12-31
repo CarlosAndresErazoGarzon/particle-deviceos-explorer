@@ -1,4 +1,4 @@
-# Particle Photon 2: RTOS Hybrid Architecture Explorer
+# Particle Photon 2: DeviceOS Explorer
 
 This project demonstrates an implementation of a Hybrid RTOS Architecture on the Particle Photon 2 (Realtek RTL872x). 
 
